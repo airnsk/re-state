@@ -1,63 +1,34 @@
-(ns nodename.stately.comms
-  (:require [nodename.stately.communications.standalone-api :as st]
-            [nodename.stately.communications.re-frame-api :as rf]
-            [clojure.set :refer [difference]]))
+(ns re-state.comms
+  (:require [re-frame.core :as rf]
+            [re-frame.loggers :as loggers]
+            [re-frame.registrar :as registrar]
+            [re-frame.db :as db]))
 
+(def dispatch rf/dispatch)
+(def subscribe rf/subscribe)
+(def run-queue #()) ;; rf runs the queue automatically
 
-(def re-frame-comms
-  {:dispatch rf/dispatch
-   :run-queue #()
-   :register-handler rf/register-handler
-   :lookup-handler rf/lookup-handler
-   :log rf/log
-   :warn rf/warn
-   :error rf/error
-   :app-db rf/app-db})
+(def register-handler rf/reg-event-fx)
+(def lookup-handler (partial registrar/get-handler :event))
 
-(def standalone-comms
-  {:dispatch st/dispatch
-   :run-queue st/run-queue
-   :register-handler st/register-handler
-   :lookup-handler st/lookup-handler
-   :log st/log
-   :warn st/warn
-   :error st/error
-   :app-db st/app-db})
+(def loggers (loggers/get-loggers))
+(def log (:log loggers))
+(def warn (:warn loggers))
+(def error (:error loggers))
 
-(def comms (atom standalone-comms))
-(def app-db (:app-db @comms))
+;; FIXME these are nasty
+(rf/reg-sub
+  :db/get-in
+  (fn [db [_ & args]]
+    (apply get-in db args)))
 
-(defn set-comms!
-  "Change the set (subset?) of comms functions used by stately.
-  'new-comms' should be a map which looks like default-comms"
-  [new-comms]
-  (assert (empty? (difference (set (keys new-comms)) (set (keys standalone-comms)))) "Unknown keys in new-comms")
-  (swap! comms merge new-comms)
-  (def app-db (:app-db @comms)))
+(rf/reg-event-db
+  :db/assoc-in
+  (fn [db [_ & args]]
+    (apply assoc-in db args)))
 
-(defn set-re-frame-comms!
-  []
-  (set-comms! re-frame-comms))
+(rf/reg-fx
+  :log
+  (fn [string]
+    (log string)))
 
-(defn set-standalone-comms!
-  []
-  (set-comms! standalone-comms))
-
-(defn use-re-frame!
-  [yesno]
-  (if yesno
-    (set-re-frame-comms!)
-    (set-standalone-comms!)))
-
-
-(defn dispatch [event-v] ((:dispatch @comms) event-v))
-(defn run-queue [] ((:run-queue @comms)))
-(defn register-handler
-  ([id handler]
-   ((:register-handler @comms) id handler))
-  ([id middleware handler]
-   ((:register-handler @comms) id middleware handler)))
-(defn lookup-handler [event-id] ((:lookup-handler @comms) event-id))
-(defn log [& args] ((:log @comms) [args]))
-(defn warn [& args] ((:warn @comms) [args]))
-(defn error [& args] ((:error @comms) [args]))

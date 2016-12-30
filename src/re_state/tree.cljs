@@ -1,5 +1,5 @@
-(ns nodename.stately.tree
-  (:require [nodename.stately.comms :refer [app-db]]))
+(ns re-state.tree
+  (:require [re-state.comms :refer [dispatch subscribe]]))
 
 
 ;; TREE ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -43,20 +43,20 @@
   [state-machines root-fsm-key]
   (let [tree (state-tree state-machines root-fsm-key)
         parents (parent-map tree)]
-    (swap! app-db assoc
-           :tree tree
-           :parents parents)))
+    (dispatch [:db/assoc-in [root-fsm-key]
+                     :tree tree
+                     :parents parents])))
 
 (defn tree
   []
-  (:tree @app-db))
+  @(subscribe [:db/get-in [:tree]]))
 
 
 (defn super
   "Given a state-key, return its superstate;
   given an fsm-key, return its super-fsm"
   [k]
-  (let [parent-map (:parents @app-db)
+  (let [parent-map @(subscribe [:db/get-in [:parents]])
         p (get parent-map k)]
     (get parent-map p)))
 
@@ -68,11 +68,11 @@
 
 (defn active-states
   []
-  (get @app-db :active-states))
+  @(subscribe [:db/get-in [:active-states]]))
 
 (defn set-active-states!
-  [states]
-  (swap! app-db assoc :active-states states))
+  [states root-fsm-key]
+  (dispatch [:db/assoc-in [root-fsm-key] :active-states states]))
 
 
 
@@ -102,3 +102,4 @@
                            (= (first exit) (first entrance)))
                     (recur (rest exit) (rest entrance))
                     [(reverse exit) entrance])))))
+

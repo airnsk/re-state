@@ -1,7 +1,6 @@
-(ns nodename.stately.chart
-  (:require [nodename.stately.comms :refer [register-handler dispatch]]
-            [nodename.stately.tree :refer [lca-path]]))
-
+(ns re-state.chart
+  (:require [re-state.comms :refer [register-handler dispatch]]
+            [re-state.tree :refer [lca-path]]))
 
 (defn- set-active
   "return modified set of active states"
@@ -16,7 +15,8 @@
 
 
 ;; ACTIONS ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
+;; key: [trigger action]
+;; value: either function or vector (fn and args)
 
 
 (defn- register-action-handlers
@@ -25,14 +25,15 @@
     (let [handler (if (fn? action)
                     action
                     ;; vector: fn and args:
-                    (fn [db values]
-                      ((first action)
-                        db (concat (rest action) values))))]
+                    (let [[f & args] action]
+                      (fn [ctx values]
+                        (f ctx (concat args values)))))]
       (register-handler trigger middleware handler))))
 
 
 
 ;; ACTIVITIES ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; ??? unsure
 
 
 
@@ -51,25 +52,23 @@
 (defn- register-activity-handlers
   [middleware {:keys [all-states all-activities] :as chart-data}]
   (doseq [[_ state-data] all-states]
-    (let [{activities :activities
-           :or {:activities []}} state-data]
+    (let [{:keys [activities] :or {:activities []}} state-data]
       (doseq [activity activities]
-        (let [{start :start
-               stop :stop} (get all-activities activity)]
+        (let [{:keys [start stop]} (get all-activities activity)]
           (when start
             (let [trigger (start-action activity)]
               (register-handler trigger
-                                middleware
-                                (fn [db]
-                                  (dispatch start)
-                                  db))))
+                                middleware  ;; TODO pass in own fn and interceptors
+                                (fn [{:keys [db]}]
+                                  {:dispatch start
+                                   :db db}))))
           (when stop
             (let [trigger (stop-action activity)]
               (register-handler trigger
-                                middleware
-                                (fn [db]
-                                  (dispatch stop)
-                                  db)))))))))
+                                middleware  ;; TODO pass in own fn and interceptors
+                                (fn [{:keys [db]}]
+                                  {:dispatch stop
+                                   :db db})))))))))
 
 
 
@@ -77,11 +76,11 @@
 
 
 
-(defn- show-condition-not-met
+(defn- condition-not-met-msg
   [trigger current-state condition]
-  (println (str "Transition " trigger
-                " in state " current-state
-                " failed condition " condition)))
+  (str "Transition " trigger
+       " in state " current-state
+       " failed condition " condition))
 
 
 ;;; EXIT ;;;
@@ -175,17 +174,15 @@
 
 (defn- make-transition-handler
   [state-and-trigger transition {:keys [all-states] :as chart-data}]
-  (fn handler [db & [values]]
+  (fn handler [{:keys [db]} & [values]]
     (let [[current-state _] state-and-trigger
-          {condition :condition
+          {:keys [condition]
            :or {condition (constantly true)}} transition]
 
       (if-not (condition db values)
-        (do
-          (show-condition-not-met state-and-trigger current-state condition)
-          db)
-        (let [{target :target
-               actions :actions
+        {:db db
+         :log (condition-not-met-msg state-and-trigger current-state condition)}
+        (let [{:keys [target actions]
                :or {actions []}} transition
 
               ;; handle computed target:
@@ -197,11 +194,13 @@
 
               ;; each action gets my values appended after any explicit values it carries:
               actions (map #(if values
-                             (vec (concat % values))
-                             %) actions)
+                              (vec (concat % values))
+                              %) actions)
 
               active-states (get db :active-states)
 
+              ;; FIXME implicit dispatch calls in active states. add them to :dispatch-n
+              ;; but this is hard to do... how about make it an fx handler?
               ;; exiting the last state will first exit all of its active substates,
               ;; including any preceding states in exit-path:
               active-states (exit-state (last exit-path) all-states active-states)
@@ -214,10 +213,11 @@
 
           ;; Unlike in the UML spec, we invoke actions associated with the transition
           ;; in the context of the target state:
-          (doseq [action actions]
-            (dispatch action))
+          #_(doseq [action actions]
+              (dispatch action))
 
-          (assoc db :active-states active-states))))))
+          {:db (assoc db :active-states active-states)
+           :dispatch-n actions})))))
 
 
 
@@ -239,3 +239,4 @@
   (register-action-handlers middleware chart-data)
   (register-activity-handlers middleware chart-data)
   (register-transition-handlers  middleware chart-data))
+
