@@ -1,52 +1,48 @@
-(defproject stately "0.1.0"
+(defproject re-state "0.1.0-SNAPSHOT"
+  :description "statecharts in re-frame"
+  :url "https://github.com/jiangts/re-state"
+  :license {:name "MIT"
+            :url "https://opensource.org/licenses/MIT"}
+
+  :min-lein-version "2.7.1"
+
   :dependencies [[org.clojure/clojure "1.8.0"]
-                 [org.clojure/clojurescript "1.7.228"]
-                 [reagent "0.5.1" :exclusions [cljsjs/react]]
-                 [re-frame "0.6.0" :exclusions [reagent]]
-                 [com.rpl/specter "0.9.1"]]
+                 [org.clojure/clojurescript "1.9.229"]
+                 [reagent "0.6.0"]
+                 [re-frame "0.9.1"]]
 
-  :test-paths ["examples"]
+  :plugins [[lein-figwheel "0.5.8"]
+            [lein-cljsbuild "1.1.4" :exclusions [org.clojure/clojure]]]
 
-  :plugins [[lein-cljsbuild "1.1.1"]
-            [lein-doo "0.1.6"]
-            [lein-figwheel "0.5.0-2"]]
+  :clean-targets ^{:protect false} ["resources/public/js/compiled"
+                                    "target"]
 
-  :profiles {:dev
-             {:dependencies [[com.cemerick/piggieback "0.2.1"]
-                             [lein-figwheel "0.5.0-2"]
-                             [figwheel-sidecar "0.5.0-2"]]}}
+  :source-paths ["src"]
 
-  :repl-options {:nrepl-middleware [cemerick.piggieback/wrap-cljs-repl]}
+  :cljsbuild {:builds [{:id "dev"
+                        :source-paths ["src"]
+                        :figwheel true
+                        :compiler {:main       "re-state.core"
+                                   :asset-path "js/compiled/out"
+                                   :output-to  "resources/public/js/compiled/re_state.js"
+                                   :output-dir "resources/public/js/compiled/out"
+                                   :source-map-timestamp true }}
+                       {:id "prod"
+                        :source-paths ["src"]
+                        :compiler {:main       "re-state.core"
+                                   :asset-path "js/compiled/out"
+                                   :output-to  "resources/public/js/compiled/re_state.js"
+                                   :optimizations :advanced}}]}
 
-  :cljsbuild {:builds [{:id "toasteroven"
-                        :source-paths ["src" "examples/ToasterOven/src"]
-                        :compiler {:main toasteroven.core
-                                   output-to "examples/ToasterOven/target/out/main.js"
-                                   :output-dir "examples/ToasterOven/target/out"
-                                   :optimizations :none
-                                   :source-map true
-                                   :source-map-timestamp true}}
+  :figwheel { :server-port 3440 }
 
-                       {:id "quantumcalc" ;; React Native app for iOS
-                        :source-paths ["src" "examples/QuantumCalc/src"]
-                        :compiler {:main quantumcalc.core
-                                   :output-to "examples/QuantumCalc/target/out/main.js"
-                                   :output-dir "examples/QuantumCalc/target/out"
-                                   :optimizations :none
-                                   :source-map true
-                                   :source-map-timestamp true}
-                        :figwheel {:on-jsload "quantumcalc.core/on-reload"
-                                   :heads-up-display false
-                                   :debug false}}
-
-                       {:id "dining"
-                        :source-paths ["src" "examples/Dining/src"]
-                        :compiler {:main dining.core
-                                   :output-to "examples/Dining/target/out/main.js"
-                                   :output-dir "examples/Dining/target/out"
-                                   :optimizations :none
-                                   :source-map true
-                                   :source-map-timestamp true}
-                        :figwheel {:on-jsload "dining.core/on-reload"
-                                   :heads-up-display false
-                                   :debug false}}]})
+  :profiles {:dev {:dependencies [[binaryage/devtools "0.8.2"]
+                                  [figwheel-sidecar "0.5.8"]
+                                  [com.cemerick/piggieback "0.2.1"]]
+                   ;; need to add dev source path here to get user.clj loaded
+                   :source-paths ["src" "dev"]
+                   ;; for CIDER
+                   ;; :plugins [[cider/cider-nrepl "0.12.0"]]
+                   :repl-options {; for nREPL dev you really need to limit output
+                                  :init (set! *print-length* 50)
+                                  :nrepl-middleware [cemerick.piggieback/wrap-cljs-repl]}}})
