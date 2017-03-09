@@ -1,8 +1,9 @@
 /*.log
 /target
 /*-init.clj
-/resources/public/js/compiled
 out
 *swp
 .lein-repl-history
 .nrepl-port
+dev
+public

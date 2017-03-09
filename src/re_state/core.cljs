@@ -42,6 +42,7 @@
     (nested-replace selector transform-fn fsm)))
 
 
+
 ;; DISPATCH ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
@@ -77,10 +78,10 @@
   [event-v]
   (let [trigger (first event-v)
         bubble-states (->> (leaves-of-active)
-                        (map #(bubble-up % trigger))
-                        (remove #(nil? %))
-                        ;; remove duplicates:
-                        set)]
+                           (map #(bubble-up % trigger))
+                           (remove #(nil? %))
+                           ;; remove duplicates:
+                           set)]
     (doseq [state bubble-states]
       (let [new-event-v (vec (concat [[state trigger]] (rest event-v)))]
         (dispatch new-event-v)))))
@@ -99,6 +100,7 @@
 
 
 (defn start-app
+  "root-fsm-key is the namespace of the starting active state"
   [middleware state-machines root-fsm-key]
   (set-state-tree! state-machines root-fsm-key)
 
@@ -107,10 +109,10 @@
                  (apply merge-no-clobber
                         (map #(get % prop) fsms)))
 
-        all-actions (obtain :actions)
-        all-activities (obtain :activities)
-        all-transitions (obtain :transitions)
-        all-states (obtain :states)
+        all-actions      (obtain :actions)
+        all-activities   (obtain :activities)
+        all-transitions  (obtain :transitions)
+        all-states       (obtain :states)
         all-start-states (remove nil? (map #(get % :start-state) fsms))
 
         chart-data {:all-actions all-actions
@@ -119,7 +121,7 @@
                     :all-states all-states
                     :all-start-states all-start-states}]
 
-    (register-statechart middleware chart-data)
+    (register-statechart [path middleware] chart-data)
 
     (let [app-start-state (get-start-state root-fsm-key all-start-states)
           active-states (enter-state app-start-state

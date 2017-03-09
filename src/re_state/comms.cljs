@@ -16,19 +16,13 @@
 (def warn (:warn loggers))
 (def error (:error loggers))
 
-;; FIXME these are nasty
-(rf/reg-sub
-  :db/get-in
-  (fn [db [_ & args]]
-    (apply get-in db args)))
+(def statechart db/app-db)
+(def path-key :statechart)
+(def path (rf/path path-key))
+#_(add-watch statechart :debug
+           (fn [_ _ old-state new-state]
+             (when-not (identical? (path-key old-state) (path-key new-state))
+               (h/pp (path-key new-state)))))
 
-(rf/reg-event-db
-  :db/assoc-in
-  (fn [db [_ & args]]
-    (apply assoc-in db args)))
-
-(rf/reg-fx
-  :log
-  (fn [string]
-    (log string)))
+(rf/reg-fx :log log)
 

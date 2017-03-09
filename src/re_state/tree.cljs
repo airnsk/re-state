@@ -1,5 +1,5 @@
 (ns re-state.tree
-  (:require [re-state.comms :refer [dispatch subscribe]]))
+  (:require [re-state.comms :refer [statechart path-key]]))
 
 
 ;; TREE ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -43,20 +43,19 @@
   [state-machines root-fsm-key]
   (let [tree (state-tree state-machines root-fsm-key)
         parents (parent-map tree)]
-    (dispatch [:db/assoc-in [root-fsm-key]
-                     :tree tree
-                     :parents parents])))
+    (swap! statechart update-in [path-key]
+           #(assoc % :tree tree :parents parents))))
 
 (defn tree
   []
-  @(subscribe [:db/get-in [:tree]]))
+  (get-in @statechart [path-key :tree]))
 
 
 (defn super
   "Given a state-key, return its superstate;
   given an fsm-key, return its super-fsm"
   [k]
-  (let [parent-map @(subscribe [:db/get-in [:parents]])
+  (let [parent-map (get-in @statechart [path-key :parents])
         p (get parent-map k)]
     (get parent-map p)))
 
@@ -68,11 +67,11 @@
 
 (defn active-states
   []
-  @(subscribe [:db/get-in [:active-states]]))
+  (get-in @statechart [path-key :active-states]))
 
 (defn set-active-states!
   [states root-fsm-key]
-  (dispatch [:db/assoc-in [root-fsm-key] :active-states states]))
+  (swap! statechart assoc-in [path-key :active-states] states))
 
 
 

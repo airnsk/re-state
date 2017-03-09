@@ -22,18 +22,21 @@
 (defn- register-action-handlers
   [middleware {:keys [all-actions] :as chart-data}]
   (doseq [[trigger action] all-actions]
-    (let [handler (if (fn? action)
-                    action
-                    ;; vector: fn and args:
-                    (let [[f & args] action]
-                      (fn [ctx values]
-                        (f ctx (concat args values)))))]
+    (let [handler (fn [db [& values]]  ;; pass values along
+                    {:dispatch (vec (concat action values))})
+          #_(if (fn? action)
+              action
+              ;; vector: fn and args:
+              (let [[f & args] action]
+                (fn [ctx values]
+                  (f ctx (concat args values)))))]
       (register-handler trigger middleware handler))))
 
 
 
 ;; ACTIVITIES ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; ??? unsure
+;; ??? unsure. Why does this exist?
+;; why not programatically attach to entry-actions and exit-actions?
 
 
 
@@ -60,14 +63,15 @@
               (register-handler trigger
                                 middleware  ;; TODO pass in own fn and interceptors
                                 (fn [{:keys [db]}]
-                                  {:dispatch start
+                                  ;; why make a handler that only dispatches another one?
+                                  {:dispatch [start]
                                    :db db}))))
           (when stop
             (let [trigger (stop-action activity)]
               (register-handler trigger
                                 middleware  ;; TODO pass in own fn and interceptors
                                 (fn [{:keys [db]}]
-                                  {:dispatch stop
+                                  {:dispatch [stop]
                                    :db db})))))))))
 
 
@@ -100,7 +104,7 @@
   [state-data]
   (let [actions (map stop-action (:activities state-data))]
     (doseq [action actions]
-      (dispatch action)))) ;; TODO invoke directly
+      (dispatch [action])))) ;; TODO invoke directly
 
 (defn- perform-exit-actions
   [state-data]
@@ -126,7 +130,7 @@
   (let [state-data (get all-states state)
         active-states (exit-all-substates state all-states active-states)]
     (stop-activities state-data)
-    (perform-exit-actions state)
+    (perform-exit-actions state-data)
     (set-active active-states state false)))
 
 
@@ -147,7 +151,7 @@
   [state-data]
   (let [actions (map start-action (:activities state-data))]
     (doseq [action actions]
-      (dispatch action)))) ;; TODO invoke directly
+      (dispatch [action])))) ;; TODO invoke directly
 
 (declare enter-state)
 
@@ -201,9 +205,16 @@
 
               ;; FIXME implicit dispatch calls in active states. add them to :dispatch-n
               ;; but this is hard to do... how about make it an fx handler?
+              ;; note the order: first do exit-actions, then action, then entry-actions
+
               ;; exiting the last state will first exit all of its active substates,
               ;; including any preceding states in exit-path:
               active-states (exit-state (last exit-path) all-states active-states)
+
+              ;; Unlike in the UML spec, we invoke actions associated with the transition
+              ;; in the context of the target state:
+              _ (doseq [action actions]
+                  (dispatch action))
 
               active-states (reduce (fn [active-states state]
                                       (enter-state state
@@ -211,13 +222,8 @@
                                     active-states
                                     entry-path)]
 
-          ;; Unlike in the UML spec, we invoke actions associated with the transition
-          ;; in the context of the target state:
-          #_(doseq [action actions]
-              (dispatch action))
-
           {:db (assoc db :active-states active-states)
-           :dispatch-n actions})))))
+           #_#_:dispatch-n actions})))))
 
 
 
