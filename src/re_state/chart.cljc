@@ -177,7 +177,7 @@
 
 
 (defn- make-transition-handler
-  [state-and-trigger transition {:keys [all-states] :as chart-data}]
+  [statechart state-and-trigger transition {:keys [all-states] :as chart-data}]
   (fn handler [{:keys [db]} & [values]]
     (let [[current-state _] state-and-trigger
           {:keys [condition]
@@ -194,7 +194,7 @@
                        (target db values)
                        target)
 
-              [exit-path entry-path] (lca-path current-state target)
+              [exit-path entry-path] (lca-path statechart current-state target)
 
               ;; each action gets my values appended after any explicit values it carries:
               actions (map #(if values
@@ -228,9 +228,9 @@
 
 
 (defn- register-transition-handlers
-  [middleware {:keys [all-transitions] :as chart-data}]
+  [statechart middleware {:keys [all-transitions] :as chart-data}]
   (doseq [[trigger transition] all-transitions]
-    (let [handler (make-transition-handler trigger transition chart-data)]
+    (let [handler (make-transition-handler statechart trigger transition chart-data)]
       (register-handler trigger
                         middleware
                         handler))))
@@ -241,8 +241,8 @@
 
 
 (defn register-statechart
-  [middleware chart-data]
+  [statechart middleware chart-data]
   (register-action-handlers middleware chart-data)
   (register-activity-handlers middleware chart-data)
-  (register-transition-handlers  middleware chart-data))
+  (register-transition-handlers statechart middleware chart-data))
 

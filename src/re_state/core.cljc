@@ -49,13 +49,13 @@
 
 (defn- leaves-of-active
   "Currently active states that have no currently active child states"
-  []
-  (loop [active (active-states)
+  [statechart]
+  (loop [active (active-states statechart)
          leaves []]
     (let [s (first active)]
       (if (nil? s)
         leaves
-        (let [s-has-child? (some #(= s (super %)) (rest active))]
+        (let [s-has-child? (some #(= s (super statechart %)) (rest active))]
           (recur (rest active)
                  (if s-has-child?
                    leaves
@@ -64,21 +64,21 @@
 
 (defn- bubble-up
   "Find first ancestor state for which the transition key [state trigger] is registered"
-  [state trigger]
+  [statechart state trigger]
   (loop [state state]
     (if (or (nil? state)
             (lookup-handler [state trigger]))
       state
-      (recur (super state)))))
+      (recur (super statechart state)))))
 
 
 (defn dispatch-transition
   "Bubble up the state hierarchy from the leaf active states
   to states that implement the transition, and dispatch"
-  [event-v]
+  [statechart event-v]
   (let [trigger (first event-v)
-        bubble-states (->> (leaves-of-active)
-                           (map #(bubble-up % trigger))
+        bubble-states (->> (leaves-of-active statechart)
+                           (map #(bubble-up statechart % trigger))
                            (remove #(nil? %))
                            ;; remove duplicates:
                            set)]
@@ -101,8 +101,8 @@
 
 (defn start-app
   "root-fsm-key is the namespace of the starting active state"
-  [middleware state-machines root-fsm-key]
-  (set-state-tree! state-machines root-fsm-key)
+  [statechart middleware state-machines root-fsm-key]
+  (set-state-tree! statechart state-machines root-fsm-key)
 
   (let [fsms (vals state-machines)
         obtain (fn [prop]
@@ -126,5 +126,5 @@
     (let [app-start-state (get-start-state root-fsm-key all-start-states)
           active-states (enter-state app-start-state
                                      [] #{} chart-data)]
-      (set-active-states! active-states root-fsm-key))))
+      (set-active-states! statechart active-states root-fsm-key))))
 

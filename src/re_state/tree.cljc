@@ -1,5 +1,4 @@
-(ns re-state.tree
-  (:require [re-state.comms :refer [statechart path-key]]))
+(ns re-state.tree)
 
 
 ;; TREE ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -40,22 +39,21 @@
     (apply assoc {} kvs)))
 
 (defn set-state-tree!
-  [state-machines root-fsm-key]
+  [statechart state-machines root-fsm-key]
   (let [tree (state-tree state-machines root-fsm-key)
         parents (parent-map tree)]
-    (swap! statechart update-in [path-key]
-           #(assoc % :tree tree :parents parents))))
+    (swap! statechart assoc :tree tree :parents parents)))
 
 (defn tree
-  []
-  (get-in @statechart [path-key :tree]))
+  [statechart]
+  (get @statechart :tree))
 
 
 (defn super
   "Given a state-key, return its superstate;
   given an fsm-key, return its super-fsm"
-  [k]
-  (let [parent-map (get-in @statechart [path-key :parents])
+  [statechart k]
+  (let [parent-map (get @statechart :parents)
         p (get parent-map k)]
     (get parent-map p)))
 
@@ -66,12 +64,12 @@
 
 
 (defn active-states
-  []
-  (get-in @statechart [path-key :active-states]))
+  [statechart]
+  (get @statechart :active-states))
 
 (defn set-active-states!
-  [states root-fsm-key]
-  (swap! statechart assoc-in [path-key :active-states] states))
+  [statechart states root-fsm-key]
+  (swap! statechart assoc :active-states states))
 
 
 
@@ -80,21 +78,21 @@
 
 
 (defn- path-to-root
-  [state-kw]
+  [statechart state-kw]
   (if (nil? state-kw)
     []
-    (concat [state-kw] (path-to-root (super state-kw)))))
+    (concat [state-kw] (path-to-root (super statechart state-kw)))))
 
 
 (defn lca-path
   "Return states-to-exit and states-to-enter,
   which constitute the path from from-state to to-state
   via least common ancestor"
-  [from-state to-state]
+  [statechart from-state to-state]
   (cond (= :internal to-state) [[] []]
         (= from-state to-state) [[from-state] [to-state]]
-        :else (let [exit-path (reverse (path-to-root from-state))
-                    entrance-path (reverse (path-to-root to-state))]
+        :else (let [exit-path (reverse (path-to-root statechart from-state))
+                    entrance-path (reverse (path-to-root statechart to-state))]
                 (loop [exit exit-path
                        entrance entrance-path]
                   (if (and (first exit)
