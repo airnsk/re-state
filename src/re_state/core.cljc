@@ -17,7 +17,7 @@
 
 (defn- get-ns
   [fsm]
-  (namespace (first (keys (:states fsm)))))
+  (-> fsm :states keys first namespace))
 
 (defn- transform-kw
   [kw orig-ns ns]
@@ -121,7 +121,7 @@
                     :all-states all-states
                     :all-start-states all-start-states}]
 
-    (register-statechart [path middleware] chart-data)
+    (register-statechart middleware chart-data)
 
     (let [app-start-state (get-start-state root-fsm-key all-start-states)
           active-states (enter-state app-start-state
